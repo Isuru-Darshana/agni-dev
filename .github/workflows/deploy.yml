@@ -1,0 +1,94 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev'
+    environment: staging
+    needs: []
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/agni-guard-backend:staging ./backend
+          docker push $ECR_REGISTRY/agni-guard-backend:staging
+
+      - name: Deploy to ECS staging
+        run: |
+          aws ecs update-service \
+            --cluster agni-guard-staging \
+            --service agni-guard-backend-staging \
+            --force-new-deployment
+
+      - name: Deploy frontend to staging S3
+        run: |
+          aws s3 sync frontend/ \
+            s3://${{ secrets.S3_BUCKET_STAGING }} --delete
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/agni-guard-backend:$IMAGE_TAG ./backend
+          docker tag $ECR_REGISTRY/agni-guard-backend:$IMAGE_TAG \
+            $ECR_REGISTRY/agni-guard-backend:latest
+          docker push $ECR_REGISTRY/agni-guard-backend:$IMAGE_TAG
+          docker push $ECR_REGISTRY/agni-guard-backend:latest
+
+      - name: Deploy to ECS production
+        run: |
+          aws ecs update-service \
+            --cluster agni-guard-production \
+            --service agni-guard-backend-production \
+            --force-new-deployment
+
+      - name: Deploy frontend to production S3
+        run: |
+          aws s3 sync frontend/ \
+            s3://${{ secrets.S3_BUCKET_PROD }} --delete
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DIST_ID }} \
+            --paths "/*"
