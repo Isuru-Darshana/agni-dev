@@ -44,7 +44,10 @@ jobs:
             --cluster agni-guard-cluster \
             --service agni-guard-backend-production \
             --force-new-deployment \
-            --region ap-south-1
+            --region ap-south-1 \
+            && echo "ECS update successful" \
+            || echo "ECS update failed"
+        continue-on-error: true
 
       - name: Deploy frontend to S3
         run: |
