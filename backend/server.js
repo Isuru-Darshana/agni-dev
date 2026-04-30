@@ -10,7 +10,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ── Health Check FIRST ───────────────────────────────
+// ── State ─────────────────────────────────────────────
+let sheetsReady = false;
+
+// ── Health Check (must be first) ──────────────────────
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
@@ -20,7 +23,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ── Google Sheets Configuration ──────────────────────
+// ── Google Sheets Configuration ───────────────────────
 const SHEET_ID = process.env.SHEET_ID;
 const CLIENT_EMAIL = process.env.CLIENT_EMAIL;
 const PRIVATE_KEY = process.env.PRIVATE_KEY
@@ -28,7 +31,6 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY
   : '';
 
 const doc = new GoogleSpreadsheet(SHEET_ID);
-let sheetsReady = false;
 
 async function initSheet() {
   try {
@@ -54,30 +56,30 @@ if (process.env.NODE_ENV !== 'test') {
 function parseNodeRow(row) {
   return {
     timestamp:       row['Timestamp'],
-    nodeId:          parseInt(row['Node ID'])          || 0,
+    nodeId:          parseInt(row['Node ID'])                || 0,
     online:          row['Online'] === 'Online',
-    temp680:         parseFloat(row['T680 (°C)'])       || 0,
-    humidity680:     parseFloat(row['H680 (%)'])        || 0,
-    pressure680:     parseFloat(row['P680 (hPa)'])      || 0,
-    gasResistance:   parseFloat(row['Gas R (Ω)'])       || 0,
-    temp280:         parseFloat(row['T280 (°C)'])       || 0,
-    humidity280:     parseFloat(row['H280 (%)'])        || 0,
-    pressure280:     parseFloat(row['P280 (hPa)'])      || 0,
-    pm25:            parseFloat(row['PM2.5 (µg/m³)'])   || 0,
-    pm10:            parseFloat(row['PM10 (µg/m³)'])    || 0,
-    tempFused:       parseFloat(row['Temp Fused (°C)'])       || 0,
-    humidityFused:   parseFloat(row['Humidity Fused (%)'])    || 0,
-    pressureFused:   parseFloat(row['Pressure Fused (hPa)'])  || 0,
-    gasRatio:        parseFloat(row['Gas Ratio'])        || 0,
-    riskScore:       parseFloat(row['Risk Score'])       || 0,
-    fireStage:       parseInt(row['Fire Stage'])         || 0,
-    stageName:       row['Stage Name']                  || 'NORMAL',
-    tempRate:        parseFloat(row['Temp Rate (°C/min)'])    || 0,
-    humidityRate:    parseFloat(row['Humidity Rate (%/min)']) || 0,
-    gasRate:         parseFloat(row['Gas Rate (Ω/min)'])      || 0,
-    soc:             parseFloat(row['SOC (%)'])          || 0,
-    rssi:            parseInt(row['RSSI (dBm)'])         || 0,
-    interval:        parseFloat(row['Interval (min)'])   || 0
+    temp680:         parseFloat(row['T680 (°C)'])            || 0,
+    humidity680:     parseFloat(row['H680 (%)'])             || 0,
+    pressure680:     parseFloat(row['P680 (hPa)'])           || 0,
+    gasResistance:   parseFloat(row['Gas R (Ω)'])            || 0,
+    temp280:         parseFloat(row['T280 (°C)'])            || 0,
+    humidity280:     parseFloat(row['H280 (%)'])             || 0,
+    pressure280:     parseFloat(row['P280 (hPa)'])           || 0,
+    pm25:            parseFloat(row['PM2.5 (µg/m³)'])        || 0,
+    pm10:            parseFloat(row['PM10 (µg/m³)'])         || 0,
+    tempFused:       parseFloat(row['Temp Fused (°C)'])      || 0,
+    humidityFused:   parseFloat(row['Humidity Fused (%)'])   || 0,
+    pressureFused:   parseFloat(row['Pressure Fused (hPa)'])|| 0,
+    gasRatio:        parseFloat(row['Gas Ratio'])            || 0,
+    riskScore:       parseFloat(row['Risk Score'])           || 0,
+    fireStage:       parseInt(row['Fire Stage'])             || 0,
+    stageName:       row['Stage Name']                       || 'NORMAL',
+    tempRate:        parseFloat(row['Temp Rate (°C/min)'])   || 0,
+    humidityRate:    parseFloat(row['Humidity Rate (%/min)'])|| 0,
+    gasRate:         parseFloat(row['Gas Rate (Ω/min)'])     || 0,
+    soc:             parseFloat(row['SOC (%)'])              || 0,
+    rssi:            parseInt(row['RSSI (dBm)'])             || 0,
+    interval:        parseFloat(row['Interval (min)'])       || 0
   };
 }
 
@@ -90,6 +92,7 @@ app.get('/api/sensor-data', async (req, res) => {
   try {
     const sheet = doc.sheetsByIndex[1];
     const rows = await sheet.getRows();
+    console.log(`Fetched ${rows.length} rows from NodeData`);
     res.json(rows.map(parseNodeRow));
   } catch (error) {
     console.error('Error fetching sensor data:', error);
@@ -121,21 +124,21 @@ app.get('/api/aggregate', async (req, res) => {
     const latestRow = rows[rows.length - 1];
     res.json({
       timestamp:     latestRow['Timestamp'],
-      totalNodes:    parseInt(latestRow['Total Nodes'])   || 0,
-      online:        parseInt(latestRow['Online'])         || 0,
-      offline:       parseInt(latestRow['Offline'])        || 0,
-      tempAvg:       parseFloat(latestRow['Temp Avg'])     || 0,
-      humidityAvg:   parseFloat(latestRow['Humidity Avg']) || 0,
-      pm25Avg:       parseFloat(latestRow['PM2.5 Avg'])    || 0,
-      gasRatioAvg:   parseFloat(latestRow['Gas Ratio Avg'])|| 0,
-      riskAvg:       parseFloat(latestRow['Risk Avg'])     || 0,
-      riskMax:       parseFloat(latestRow['Risk Max'])     || 0,
-      fireStage:     parseInt(latestRow['Fire Stage'])     || 0,
-      stageName:     latestRow['Stage Name']              || 'NORMAL',
-      normalCount:   parseInt(latestRow['Normal Count'])   || 0,
-      alertCount:    parseInt(latestRow['Alert Count'])    || 0,
-      elevatedCount: parseInt(latestRow['Elevated Count']) || 0,
-      criticalCount: parseInt(latestRow['Critical Count']) || 0
+      totalNodes:    parseInt(latestRow['Total Nodes'])    || 0,
+      online:        parseInt(latestRow['Online'])          || 0,
+      offline:       parseInt(latestRow['Offline'])         || 0,
+      tempAvg:       parseFloat(latestRow['Temp Avg'])      || 0,
+      humidityAvg:   parseFloat(latestRow['Humidity Avg'])  || 0,
+      pm25Avg:       parseFloat(latestRow['PM2.5 Avg'])     || 0,
+      gasRatioAvg:   parseFloat(latestRow['Gas Ratio Avg']) || 0,
+      riskAvg:       parseFloat(latestRow['Risk Avg'])      || 0,
+      riskMax:       parseFloat(latestRow['Risk Max'])      || 0,
+      fireStage:     parseInt(latestRow['Fire Stage'])      || 0,
+      stageName:     latestRow['Stage Name']               || 'NORMAL',
+      normalCount:   parseInt(latestRow['Normal Count'])    || 0,
+      alertCount:    parseInt(latestRow['Alert Count'])     || 0,
+      elevatedCount: parseInt(latestRow['Elevated Count'])  || 0,
+      criticalCount: parseInt(latestRow['Critical Count'])  || 0
     });
   } catch (error) {
     console.error('Error fetching aggregate:', error);
@@ -153,8 +156,8 @@ app.get('/api/alerts', async (req, res) => {
     res.json(rows.map(row => ({
       timestamp: row['Timestamp'],
       nodeId:    parseInt(row['Node ID']) || 0,
-      alertType: row['Alert Type']       || '',
-      message:   row['Message']          || '',
+      alertType: row['Alert Type']        || '',
+      message:   row['Message']           || '',
       resolved:  row['Resolved'] === 'Yes'
     })));
   } catch (error) {
@@ -188,9 +191,9 @@ if (process.env.NODE_ENV !== 'test') {
         node: parseNodeRow(nodeRows[nodeRows.length - 1]),
         aggregate: {
           stageName:  aggRows[aggRows.length - 1]['Stage Name'] || 'NORMAL',
-          riskAvg:    parseFloat(aggRows[aggRows.length - 1]['Risk Avg']) || 0,
-          online:     parseInt(aggRows[aggRows.length - 1]['Online'])     || 0,
-          totalNodes: parseInt(aggRows[aggRows.length - 1]['Total Nodes'])|| 0
+          riskAvg:    parseFloat(aggRows[aggRows.length - 1]['Risk Avg'])     || 0,
+          online:     parseInt(aggRows[aggRows.length - 1]['Online'])         || 0,
+          totalNodes: parseInt(aggRows[aggRows.length - 1]['Total Nodes'])    || 0
         },
         broadcastTime: new Date().toISOString()
       };
@@ -220,5 +223,10 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`✅ WebSocket running on port ${WS_PORT}`);
   });
 }
+
+// ── Test Helper ───────────────────────────────────────
+app.setTestMode = () => {
+  sheetsReady = true;
+};
 
 module.exports = app;

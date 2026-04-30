@@ -8,13 +8,11 @@ jest.mock('google-spreadsheet', () => ({
     loadInfo: jest.fn().mockResolvedValue(true),
     title: 'AGNI GUARD Test Sheet',
     sheetsByIndex: [
-      // Sheet 0: SystemLog
       {
         getRows: jest.fn().mockResolvedValue([
           { Timestamp: '46013', 'Event Type': 'TEST', Details: 'test' }
         ])
       },
-      // Sheet 1: NodeData
       {
         getRows: jest.fn().mockResolvedValue([
           {
@@ -46,7 +44,6 @@ jest.mock('google-spreadsheet', () => ({
           }
         ])
       },
-      // Sheet 2: AggregateData
       {
         getRows: jest.fn().mockResolvedValue([
           {
@@ -69,7 +66,6 @@ jest.mock('google-spreadsheet', () => ({
           }
         ])
       },
-      // Sheet 3: Alerts
       {
         getRows: jest.fn().mockResolvedValue([
           {
@@ -86,6 +82,15 @@ jest.mock('google-spreadsheet', () => ({
 }));
 
 const app = require('../server');
+
+beforeAll(() => {
+  app.setTestMode();
+});
+
+// ── Set sheetsReady to true for tests ────────────────
+beforeAll(() => {
+  app.set('sheetsReady', true);
+});
 
 describe('AGNI GUARD Backend API', () => {
 
