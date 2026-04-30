@@ -2,6 +2,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
 const express = require('express');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
+const { JWT } = require('google-auth-library');
 const cors = require('cors');
 const WebSocket = require('ws');
 require('dotenv').config();
@@ -12,6 +13,7 @@ app.use(express.json());
 
 // ── State ─────────────────────────────────────────────
 let sheetsReady = false;
+let doc = null;
 
 // ── Health Check (must be first) ──────────────────────
 app.get('/health', (req, res) => {
@@ -27,17 +29,23 @@ app.get('/health', (req, res) => {
 const SHEET_ID = process.env.SHEET_ID;
 const CLIENT_EMAIL = process.env.CLIENT_EMAIL;
 const PRIVATE_KEY = process.env.PRIVATE_KEY
-  ? process.env.PRIVATE_KEY.replace(/\\n/g, '\n')
+  ? process.env.PRIVATE_KEY
+      .replace(/\\n/g, '\n')
+      .replace(/\r/g, '')
+      .trim()
   : '';
-
-const doc = new GoogleSpreadsheet(SHEET_ID);
 
 async function initSheet() {
   try {
-    await doc.useServiceAccountAuth({
-      client_email: CLIENT_EMAIL,
-      private_key: PRIVATE_KEY,
+    const jwt = new JWT({
+      email: CLIENT_EMAIL,
+      key: PRIVATE_KEY,
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.file',
+      ],
     });
+    doc = new GoogleSpreadsheet(SHEET_ID, jwt);
     await doc.loadInfo();
     sheetsReady = true;
     console.log(`✅ Connected to Google Sheets: ${doc.title}`);
@@ -234,8 +242,9 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // ── Test Helper ───────────────────────────────────────
-app.setTestMode = () => {
+app.setTestMode = (mockDoc) => {
   sheetsReady = true;
+  doc = mockDoc || new GoogleSpreadsheet('test-sheet-id');
 };
 
 module.exports = app;

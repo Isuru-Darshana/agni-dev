@@ -1,0 +1,114 @@
+
+> agni-guard-backend@1.0.0 test
+> jest --coverage --runInBand
+
+  console.log
+    Fetched 1 rows from NodeData
+
+      at log (server.js:104:13)
+
+  console.log
+    Fetched 1 rows from NodeData
+
+      at log (server.js:104:13)
+
+  console.log
+    Fetched 1 rows from NodeData
+
+      at log (server.js:104:13)
+
+  console.log
+    Fetched 1 rows from NodeData
+
+      at log (server.js:104:13)
+
+  console.log
+    Fetched 1 rows from NodeData
+
+      at log (server.js:104:13)
+
+  console.log
+    Fetched 1 rows from NodeData
+
+      at log (server.js:104:13)
+
+  console.log
+    Fetched 1 rows from NodeData
+
+      at log (server.js:104:13)
+
+  console.log
+    Fetched 1 rows from NodeData
+
+      at log (server.js:104:13)
+
+  console.log
+    Fetched 1 rows from NodeData
+
+      at log (server.js:104:13)
+
+  console.log
+    Fetched 1 rows from NodeData
+
+      at log (server.js:104:13)
+
+  console.log
+    Fetched 1 rows from NodeData
+
+      at log (server.js:104:13)
+
+PASS tests/api.test.js
+  AGNI GUARD Backend API
+    Health Endpoint
+      √ GET /health returns 200 (20 ms)
+      √ GET /health returns ok status (13 ms)
+      √ GET /health returns timestamp (3 ms)
+      √ GET /health returns sheets status (3 ms)
+    GET /api/sensor-data
+      √ returns 200 (29 ms)
+      √ returns array (7 ms)
+      √ has correct sensor fields (6 ms)
+      √ values are numbers not strings (5 ms)
+      √ has both BME680 and BME280 readings (6 ms)
+      √ online status is boolean (5 ms)
+      √ has battery and signal fields (3 ms)
+      √ fire stage is valid number (4 ms)
+      √ risk score is within valid range 0-100 (6 ms)
+      √ has rate of change fields (5 ms)
+      √ has particulate matter fields (4 ms)
+    GET /api/sensor-data/latest
+      √ returns 200 (3 ms)
+      √ returns object not array (3 ms)
+      √ has all AGNI GUARD fields (3 ms)
+      √ stageName is valid fire stage (3 ms)
+      √ pressure readings exist (3 ms)
+    GET /api/aggregate
+      √ returns 200 (3 ms)
+      √ has system summary fields (3 ms)
+      √ online count is non negative (3 ms)
+      √ risk average is within range (3 ms)
+      √ stage counts are non negative (4 ms)
+      √ total nodes matches mock data (3 ms)
+      √ has environmental averages (2 ms)
+    GET /api/alerts
+      √ returns 200 (3 ms)
+      √ returns array (2 ms)
+      √ alert has required fields (2 ms)
+      √ resolved field is boolean (2 ms)
+      √ alert type is string (2 ms)
+      √ unresolved alert has resolved false (2 ms)
+    Error Handling
+      √ unknown route returns 404 (3 ms)
+      √ unknown route returns json error message (3 ms)
+
+-----------|---------|----------|---------|---------|------------------------------------------------------
+File       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                    
+-----------|---------|----------|---------|---------|------------------------------------------------------
+All files  |   73.61 |    55.88 |      90 |   73.23 |                                                      
+ server.js |   73.61 |    55.88 |      90 |   73.23 | 39-53,99,107-108,114,121-122,128,153-154,160,173-174 
+-----------|---------|----------|---------|---------|------------------------------------------------------
+Test Suites: 1 passed, 1 total
+Tests:       35 passed, 35 total
+Snapshots:   0 total
+Time:        1.213 s, estimated 2 s
+Ran all test suites.
