@@ -10,7 +10,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ── Google Sheets Configuration ─────────────────────────
+// ── Health Check FIRST ───────────────────────────────
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    service: 'agni-guard-backend',
+    sheets: sheetsReady ? 'connected' : 'connecting'
+  });
+});
+
+// ── Google Sheets Configuration ──────────────────────
 const SHEET_ID = process.env.SHEET_ID;
 const CLIENT_EMAIL = process.env.CLIENT_EMAIL;
 const PRIVATE_KEY = process.env.PRIVATE_KEY
@@ -18,32 +28,29 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY
   : '';
 
 const doc = new GoogleSpreadsheet(SHEET_ID);
+let sheetsReady = false;
 
 async function initSheet() {
-  await doc.useServiceAccountAuth({
-    client_email: CLIENT_EMAIL,
-    private_key: PRIVATE_KEY,
-  });
-  await doc.loadInfo();
-  console.log(`Connected to Google Sheets: ${doc.title}`);
+  try {
+    await doc.useServiceAccountAuth({
+      client_email: CLIENT_EMAIL,
+      private_key: PRIVATE_KEY,
+    });
+    await doc.loadInfo();
+    sheetsReady = true;
+    console.log(`✅ Connected to Google Sheets: ${doc.title}`);
+  } catch (err) {
+    console.error('❌ Google Sheets init failed:', err.message);
+    console.log('Retrying in 30 seconds...');
+    setTimeout(initSheet, 30000);
+  }
 }
 
 if (process.env.NODE_ENV !== 'test') {
-  initSheet().catch(err => {
-    console.error('Google Sheets init failed:', err.message);
-  });
+  initSheet();
 }
 
-// ── Health Check ────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    service: 'agni-guard-backend'
-  });
-});
-
-// ── Helper: Parse NodeData Row ──────────────────────────
+// ── Helper: Parse NodeData Row ────────────────────────
 function parseNodeRow(row) {
   return {
     timestamp:       row['Timestamp'],
@@ -74,15 +81,16 @@ function parseNodeRow(row) {
   };
 }
 
-// ── REST API Endpoints ───────────────────────────────────
+// ── REST API Endpoints ────────────────────────────────
 
 app.get('/api/sensor-data', async (req, res) => {
+  if (!sheetsReady) {
+    return res.status(503).json({ error: 'Service initializing' });
+  }
   try {
     const sheet = doc.sheetsByIndex[1];
     const rows = await sheet.getRows();
-    const data = rows.map(parseNodeRow);
-    console.log(`Fetched ${rows.length} rows from NodeData`);
-    res.json(data);
+    res.json(rows.map(parseNodeRow));
   } catch (error) {
     console.error('Error fetching sensor data:', error);
     res.status(500).json({ error: error.message });
@@ -90,11 +98,13 @@ app.get('/api/sensor-data', async (req, res) => {
 });
 
 app.get('/api/sensor-data/latest', async (req, res) => {
+  if (!sheetsReady) {
+    return res.status(503).json({ error: 'Service initializing' });
+  }
   try {
     const sheet = doc.sheetsByIndex[1];
     const rows = await sheet.getRows();
-    const latestRow = rows[rows.length - 1];
-    res.json(parseNodeRow(latestRow));
+    res.json(parseNodeRow(rows[rows.length - 1]));
   } catch (error) {
     console.error('Error fetching latest data:', error);
     res.status(500).json({ error: error.message });
@@ -102,6 +112,9 @@ app.get('/api/sensor-data/latest', async (req, res) => {
 });
 
 app.get('/api/aggregate', async (req, res) => {
+  if (!sheetsReady) {
+    return res.status(503).json({ error: 'Service initializing' });
+  }
   try {
     const sheet = doc.sheetsByIndex[2];
     const rows = await sheet.getRows();
@@ -125,30 +138,32 @@ app.get('/api/aggregate', async (req, res) => {
       criticalCount: parseInt(latestRow['Critical Count']) || 0
     });
   } catch (error) {
-    console.error('Error fetching aggregate data:', error);
+    console.error('Error fetching aggregate:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 app.get('/api/alerts', async (req, res) => {
+  if (!sheetsReady) {
+    return res.status(503).json({ error: 'Service initializing' });
+  }
   try {
     const sheet = doc.sheetsByIndex[3];
     const rows = await sheet.getRows();
-    const alerts = rows.map(row => ({
+    res.json(rows.map(row => ({
       timestamp: row['Timestamp'],
       nodeId:    parseInt(row['Node ID']) || 0,
       alertType: row['Alert Type']       || '',
       message:   row['Message']          || '',
       resolved:  row['Resolved'] === 'Yes'
-    }));
-    res.json(alerts);
+    })));
   } catch (error) {
     console.error('Error fetching alerts:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// ── WebSocket Server ─────────────────────────────────────
+// ── WebSocket Server ──────────────────────────────────
 const WS_PORT = process.env.WS_PORT || 8080;
 
 if (process.env.NODE_ENV !== 'test') {
@@ -163,20 +178,19 @@ if (process.env.NODE_ENV !== 'test') {
   });
 
   setInterval(async () => {
+    if (!sheetsReady) return;
     try {
       const nodeSheet = doc.sheetsByIndex[1];
       const aggSheet  = doc.sheetsByIndex[2];
       const nodeRows  = await nodeSheet.getRows();
       const aggRows   = await aggSheet.getRows();
-      const latestNode = parseNodeRow(nodeRows[nodeRows.length - 1]);
-      const latestAgg  = aggRows[aggRows.length - 1];
       const data = {
-        node: latestNode,
+        node: parseNodeRow(nodeRows[nodeRows.length - 1]),
         aggregate: {
-          stageName:  latestAgg['Stage Name'] || 'NORMAL',
-          riskAvg:    parseFloat(latestAgg['Risk Avg']) || 0,
-          online:     parseInt(latestAgg['Online'])     || 0,
-          totalNodes: parseInt(latestAgg['Total Nodes'])|| 0
+          stageName:  aggRows[aggRows.length - 1]['Stage Name'] || 'NORMAL',
+          riskAvg:    parseFloat(aggRows[aggRows.length - 1]['Risk Avg']) || 0,
+          online:     parseInt(aggRows[aggRows.length - 1]['Online'])     || 0,
+          totalNodes: parseInt(aggRows[aggRows.length - 1]['Total Nodes'])|| 0
         },
         broadcastTime: new Date().toISOString()
       };
@@ -191,19 +205,19 @@ if (process.env.NODE_ENV !== 'test') {
   }, 5000);
 }
 
-// ── Graceful Shutdown ────────────────────────────────────
+// ── Graceful Shutdown ─────────────────────────────────
 process.on('SIGTERM', () => {
   console.log('SIGTERM received - shutting down gracefully');
   process.exit(0);
 });
 
-// ── Start Server ─────────────────────────────────────────
+// ── Start Server ──────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    console.log(`REST API running on port ${PORT}`);
-    console.log(`WebSocket running on port ${WS_PORT}`);
+    console.log(`✅ REST API running on port ${PORT}`);
+    console.log(`✅ WebSocket running on port ${WS_PORT}`);
   });
 }
 
