@@ -43,11 +43,12 @@ async function initSheet() {
     console.log(`✅ Connected to Google Sheets: ${doc.title}`);
   } catch (err) {
     console.error('❌ Google Sheets init failed:', err.message);
-    console.log('Retrying in 30 seconds...');
+    /* istanbul ignore next */
     setTimeout(initSheet, 30000);
   }
 }
 
+/* istanbul ignore next */
 if (process.env.NODE_ENV !== 'test') {
   initSheet();
 }
@@ -55,31 +56,31 @@ if (process.env.NODE_ENV !== 'test') {
 // ── Helper: Parse NodeData Row ────────────────────────
 function parseNodeRow(row) {
   return {
-    timestamp:       row['Timestamp'],
-    nodeId:          parseInt(row['Node ID'])                || 0,
-    online:          row['Online'] === 'Online',
-    temp680:         parseFloat(row['T680 (°C)'])            || 0,
-    humidity680:     parseFloat(row['H680 (%)'])             || 0,
-    pressure680:     parseFloat(row['P680 (hPa)'])           || 0,
-    gasResistance:   parseFloat(row['Gas R (Ω)'])            || 0,
-    temp280:         parseFloat(row['T280 (°C)'])            || 0,
-    humidity280:     parseFloat(row['H280 (%)'])             || 0,
-    pressure280:     parseFloat(row['P280 (hPa)'])           || 0,
-    pm25:            parseFloat(row['PM2.5 (µg/m³)'])        || 0,
-    pm10:            parseFloat(row['PM10 (µg/m³)'])         || 0,
-    tempFused:       parseFloat(row['Temp Fused (°C)'])      || 0,
-    humidityFused:   parseFloat(row['Humidity Fused (%)'])   || 0,
-    pressureFused:   parseFloat(row['Pressure Fused (hPa)'])|| 0,
-    gasRatio:        parseFloat(row['Gas Ratio'])            || 0,
-    riskScore:       parseFloat(row['Risk Score'])           || 0,
-    fireStage:       parseInt(row['Fire Stage'])             || 0,
-    stageName:       row['Stage Name']                       || 'NORMAL',
-    tempRate:        parseFloat(row['Temp Rate (°C/min)'])   || 0,
-    humidityRate:    parseFloat(row['Humidity Rate (%/min)'])|| 0,
-    gasRate:         parseFloat(row['Gas Rate (Ω/min)'])     || 0,
-    soc:             parseFloat(row['SOC (%)'])              || 0,
-    rssi:            parseInt(row['RSSI (dBm)'])             || 0,
-    interval:        parseFloat(row['Interval (min)'])       || 0
+    timestamp:     row['Timestamp'],
+    nodeId:        parseInt(row['Node ID'])                || 0,
+    online:        row['Online'] === 'Online',
+    temp680:       parseFloat(row['T680 (°C)'])            || 0,
+    humidity680:   parseFloat(row['H680 (%)'])             || 0,
+    pressure680:   parseFloat(row['P680 (hPa)'])           || 0,
+    gasResistance: parseFloat(row['Gas R (Ω)'])            || 0,
+    temp280:       parseFloat(row['T280 (°C)'])            || 0,
+    humidity280:   parseFloat(row['H280 (%)'])             || 0,
+    pressure280:   parseFloat(row['P280 (hPa)'])           || 0,
+    pm25:          parseFloat(row['PM2.5 (µg/m³)'])        || 0,
+    pm10:          parseFloat(row['PM10 (µg/m³)'])         || 0,
+    tempFused:     parseFloat(row['Temp Fused (°C)'])      || 0,
+    humidityFused: parseFloat(row['Humidity Fused (%)'])   || 0,
+    pressureFused: parseFloat(row['Pressure Fused (hPa)']) || 0,
+    gasRatio:      parseFloat(row['Gas Ratio'])            || 0,
+    riskScore:     parseFloat(row['Risk Score'])           || 0,
+    fireStage:     parseInt(row['Fire Stage'])             || 0,
+    stageName:     row['Stage Name']                       || 'NORMAL',
+    tempRate:      parseFloat(row['Temp Rate (°C/min)'])   || 0,
+    humidityRate:  parseFloat(row['Humidity Rate (%/min)'])|| 0,
+    gasRate:       parseFloat(row['Gas Rate (Ω/min)'])     || 0,
+    soc:           parseFloat(row['SOC (%)'])              || 0,
+    rssi:          parseInt(row['RSSI (dBm)'])             || 0,
+    interval:      parseFloat(row['Interval (min)'])       || 0
   };
 }
 
@@ -166,9 +167,15 @@ app.get('/api/alerts', async (req, res) => {
   }
 });
 
+// ── 404 Handler ───────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
 // ── WebSocket Server ──────────────────────────────────
 const WS_PORT = process.env.WS_PORT || 8080;
 
+/* istanbul ignore next */
 if (process.env.NODE_ENV !== 'test') {
   const wss = new WebSocket.Server({ port: WS_PORT });
 
@@ -209,6 +216,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // ── Graceful Shutdown ─────────────────────────────────
+/* istanbul ignore next */
 process.on('SIGTERM', () => {
   console.log('SIGTERM received - shutting down gracefully');
   process.exit(0);
@@ -217,6 +225,7 @@ process.on('SIGTERM', () => {
 // ── Start Server ──────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 
+/* istanbul ignore next */
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`✅ REST API running on port ${PORT}`);
