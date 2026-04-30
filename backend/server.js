@@ -29,12 +29,14 @@ async function initSheet() {
 }
 
 if (process.env.NODE_ENV !== 'test') {
-  initSheet();
+  initSheet().catch(err => {
+    console.error('Google Sheets init failed:', err.message);
+  });
 }
 
 // ── Health Check ────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({
+  res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     service: 'agni-guard-backend'
