@@ -125,6 +125,16 @@ app.get('/api/sensor-data/latest', async (req, res) => {
     const sheet = doc.sheetsByIndex[1];
     const rows = await sheet.getRows();
 
+    // Debug: log first row keys
+    if (rows.length > 0) {
+      const firstRowKeys = rows[0]._rawData ? 
+        sheet.headerValues : 
+        Object.keys(rows[0]);
+      console.log('Sheet headers:', JSON.stringify(sheet.headerValues));
+      console.log('First row Node ID value:', rows[0]['Node ID']);
+      console.log('Total rows:', rows.length);
+    }
+
     // Find last row with valid Node ID
     let lastValidRow = null;
     for (let i = rows.length - 1; i >= 0; i--) {
@@ -135,7 +145,11 @@ app.get('/api/sensor-data/latest', async (req, res) => {
     }
 
     if (!lastValidRow) {
-      return res.status(404).json({ error: 'No valid data found' });
+      return res.status(404).json({ 
+        error: 'No valid data found',
+        totalRows: rows.length,
+        headers: sheet.headerValues
+      });
     }
 
     res.json(parseNodeRow(lastValidRow));
