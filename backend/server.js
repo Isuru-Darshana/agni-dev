@@ -278,7 +278,7 @@ if (process.env.NODE_ENV !== 'test') {
 // ── Test Helper ───────────────────────────────────────
 app.setTestMode = () => {
   sheetsReady = true;
-  doc = { sheetsByIndex: [] };
+  doc = new GoogleSpreadsheet();
 };
 
 module.exports = app;
