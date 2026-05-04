@@ -92,6 +92,12 @@ function parseNodeRow(row) {
   };
 }
 
+// ── Helper: Check if row has valid data ───────────────
+function isValidRow(row) {
+  const nodeId = parseInt(row['Node ID']);
+  return nodeId > 0;
+}
+
 // ── REST API Endpoints ────────────────────────────────
 
 app.get('/api/sensor-data', async (req, res) => {
@@ -102,14 +108,7 @@ app.get('/api/sensor-data', async (req, res) => {
     const sheet = doc.sheetsByIndex[1];
     const rows = await sheet.getRows();
     console.log(`Fetched ${rows.length} rows from NodeData`);
-    
-    // Filter out rows with no real data
-    const validRows = rows.filter(row => {
-      const nodeId = parseInt(row['Node ID']);
-      const temp = parseFloat(row['Temp Fused (°C)']);
-      return nodeId > 0 && temp > 0;
-    });
-    
+    const validRows = rows.filter(isValidRow);
     console.log(`Valid rows: ${validRows.length}`);
     res.json(validRows.map(parseNodeRow));
   } catch (error) {
@@ -125,21 +124,20 @@ app.get('/api/sensor-data/latest', async (req, res) => {
   try {
     const sheet = doc.sheetsByIndex[1];
     const rows = await sheet.getRows();
-    
-    // Find last row with real data (non-zero tempFused)
+
+    // Find last row with valid Node ID
     let lastValidRow = null;
     for (let i = rows.length - 1; i >= 0; i--) {
-      const temp = parseFloat(rows[i]['Temp Fused (°C)']);
-      if (temp && temp > 0) {
+      if (isValidRow(rows[i])) {
         lastValidRow = rows[i];
         break;
       }
     }
-    
+
     if (!lastValidRow) {
       return res.status(404).json({ error: 'No valid data found' });
     }
-    
+
     res.json(parseNodeRow(lastValidRow));
   } catch (error) {
     console.error('Error fetching latest data:', error);
@@ -226,8 +224,20 @@ if (process.env.NODE_ENV !== 'test') {
       const aggSheet  = doc.sheetsByIndex[2];
       const nodeRows  = await nodeSheet.getRows();
       const aggRows   = await aggSheet.getRows();
+
+      // Get last valid node row
+      let lastValidNode = null;
+      for (let i = nodeRows.length - 1; i >= 0; i--) {
+        if (isValidRow(nodeRows[i])) {
+          lastValidNode = nodeRows[i];
+          break;
+        }
+      }
+
+      if (!lastValidNode) return;
+
       const data = {
-        node: parseNodeRow(nodeRows[nodeRows.length - 1]),
+        node: parseNodeRow(lastValidNode),
         aggregate: {
           stageName:  aggRows[aggRows.length - 1]['Stage Name'] || 'NORMAL',
           riskAvg:    parseFloat(aggRows[aggRows.length - 1]['Risk Avg'])     || 0,
@@ -266,9 +276,9 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // ── Test Helper ───────────────────────────────────────
-app.setTestMode = (mockDoc) => {
+app.setTestMode = () => {
   sheetsReady = true;
-  doc = mockDoc || new GoogleSpreadsheet('test-sheet-id');
+  doc = { sheetsByIndex: [] };
 };
 
 module.exports = app;
