@@ -102,7 +102,16 @@ app.get('/api/sensor-data', async (req, res) => {
     const sheet = doc.sheetsByIndex[1];
     const rows = await sheet.getRows();
     console.log(`Fetched ${rows.length} rows from NodeData`);
-    res.json(rows.map(parseNodeRow));
+    
+    // Filter out rows with no real data
+    const validRows = rows.filter(row => {
+      const nodeId = parseInt(row['Node ID']);
+      const temp = parseFloat(row['Temp Fused (°C)']);
+      return nodeId > 0 && temp > 0;
+    });
+    
+    console.log(`Valid rows: ${validRows.length}`);
+    res.json(validRows.map(parseNodeRow));
   } catch (error) {
     console.error('Error fetching sensor data:', error);
     res.status(500).json({ error: error.message });
@@ -116,7 +125,22 @@ app.get('/api/sensor-data/latest', async (req, res) => {
   try {
     const sheet = doc.sheetsByIndex[1];
     const rows = await sheet.getRows();
-    res.json(parseNodeRow(rows[rows.length - 1]));
+    
+    // Find last row with real data (non-zero tempFused)
+    let lastValidRow = null;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const temp = parseFloat(rows[i]['Temp Fused (°C)']);
+      if (temp && temp > 0) {
+        lastValidRow = rows[i];
+        break;
+      }
+    }
+    
+    if (!lastValidRow) {
+      return res.status(404).json({ error: 'No valid data found' });
+    }
+    
+    res.json(parseNodeRow(lastValidRow));
   } catch (error) {
     console.error('Error fetching latest data:', error);
     res.status(500).json({ error: error.message });

@@ -6,7 +6,8 @@
 // ============================================
 
 const API_CONFIG = {
-    GOOGLE_SHEETS_URL: 'https://script.google.com/macros/s/AKfycbyu7x0jOCNMD-Yz5tlX_qkZMXHesm8JAKbjgk6hl-msvSckS3cVXl7AA089mUP55R1Y/exec',
+    BACKEND_URL: 'http://65.2.179.194:3000',
+    WS_URL: 'ws://65.2.179.194:8080',
     FETCH_INTERVAL: 5000,
     ENABLE_LIVE_DATA: true
 };
@@ -163,23 +164,29 @@ function formatDateTime(date) {
  */
 async function fetchDashboardDataFromAPI() {
     try {
-        const url = `${API_CONFIG.GOOGLE_SHEETS_URL}?action=getDashboardData`;
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        const [nodesRes, aggregateRes, alertsRes] = await Promise.all([
+            fetch(`${API_CONFIG.BACKEND_URL}/api/sensor-data`),
+            fetch(`${API_CONFIG.BACKEND_URL}/api/aggregate`),
+            fetch(`${API_CONFIG.BACKEND_URL}/api/alerts`)
+        ]);
+
+        if (!nodesRes.ok || !aggregateRes.ok) {
+            throw new Error('Backend API error');
         }
-        
-        const result = await response.json();
-        
-        if (!result.status || result.status !== 'ok') {
-            throw new Error(result.message || 'Failed to fetch data');
-        }
-        
-        return result;
-        
+
+        const nodes = await nodesRes.json();
+        const aggregate = await aggregateRes.json();
+        const alerts = await alertsRes.json();
+
+        return {
+            status: 'ok',
+            nodes: nodes,
+            aggregate: aggregate,
+            alerts: alerts
+        };
+
     } catch (error) {
-        console.error('❌ Error fetching dashboard data:', error);
+        console.error('❌ Error fetching from backend:', error);
         return null;
     }
 }
@@ -672,6 +679,51 @@ function updateTabStatusIndicators() {
     }
 }
 
+let wsConnection = null;
+
+function connectWebSocket() {
+    try {
+        wsConnection = new WebSocket(API_CONFIG.WS_URL);
+        
+        wsConnection.onopen = () => {
+            console.log('✅ WebSocket connected to backend');
+        };
+        
+        wsConnection.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.node) {
+                    const node = data.node;
+                    if (node.nodeId && nodesData[node.nodeId]) {
+                        nodesData[node.nodeId] = {
+                            ...nodesData[node.nodeId],
+                            ...node,
+                            timestamp: new Date(node.timestamp)
+                        };
+                        updateTabStatusIndicators();
+                        if (node.nodeId === currentActiveNode) {
+                            updateNodeDashboard(currentActiveNode);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('WebSocket message error:', e);
+            }
+        };
+        
+        wsConnection.onclose = () => {
+            console.log('WebSocket disconnected, reconnecting in 5s...');
+            setTimeout(connectWebSocket, 5000);
+        };
+        
+        wsConnection.onerror = (err) => {
+            console.error('WebSocket error:', err);
+        };
+        
+    } catch (err) {
+        console.error('WebSocket connection failed:', err);
+    }
+}
 /**
  * Start dashboard
  */
@@ -682,6 +734,9 @@ async function startDashboard() {
     
     // Initialize tabs
     initializeNodeTabs();
+    
+    // Connect WebSocket for real-time updates
+    connectWebSocket();
     
     // Initial update
     await updateDashboard();
