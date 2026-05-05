@@ -14,6 +14,7 @@ app.use(express.json());
 // ── State ─────────────────────────────────────────────
 let sheetsReady = false;
 let doc = null;
+let headerMap = {};
 
 // ── Health Check (must be first) ──────────────────────
 app.get('/health', (req, res) => {
@@ -35,6 +36,15 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY
       .trim()
   : '';
 
+async function buildHeaderMap(sheet) {
+  await sheet.loadHeaderRow();
+  headerMap = {};
+  sheet.headerValues.forEach((header, index) => {
+    if (header) headerMap[header] = index;
+  });
+  console.log('✅ Header map built:', JSON.stringify(headerMap));
+}
+
 async function initSheet() {
   try {
     const jwt = new JWT({
@@ -47,6 +57,7 @@ async function initSheet() {
     });
     doc = new GoogleSpreadsheet(SHEET_ID, jwt);
     await doc.loadInfo();
+    await buildHeaderMap(doc.sheetsByIndex[1]);
     sheetsReady = true;
     console.log(`✅ Connected to Google Sheets: ${doc.title}`);
   } catch (err) {
@@ -61,43 +72,53 @@ if (process.env.NODE_ENV !== 'test') {
   initSheet();
 }
 
-// ── Helper: Parse NodeData Row ────────────────────────
-function parseNodeRow(row) {
+// ── Helper: Get value from row by header name ─────────
+function getVal(row, name) {
+  // Handle test mocks (plain objects with direct properties)
+  if (row[name] !== undefined) {
+    return row[name];
+  }
+  // Handle real Google Sheets rows (_rawData array)
   const d = row._rawData || [];
-  return {
-    timestamp:     d[0]  || row['Timestamp']                || '',
-    nodeId:        parseInt(d[1]  || row['Node ID'])         || 0,
-    online:        (d[2]  || row['Online'])                  === 'Online',
-    temp680:       parseFloat(d[3]  || row['T680 (°C)'])     || 0,
-    humidity680:   parseFloat(d[4]  || row['H680 (%)'])      || 0,
-    pressure680:   parseFloat(d[5]  || row['P680 (hPa)'])    || 0,
-    gasResistance: parseFloat(d[6]  || row['Gas R (Ω)'])     || 0,
-    temp280:       parseFloat(d[7]  || row['T280 (°C)'])     || 0,
-    humidity280:   parseFloat(d[8]  || row['H280 (%)'])      || 0,
-    pressure280:   parseFloat(d[9]  || row['P280 (hPa)'])    || 0,
-    pm25:          parseFloat(d[10] || row['PM2.5 (µg/m³)']) || 0,
-    pm10:          parseFloat(d[11] || row['PM10 (µg/m³)'])  || 0,
-    tempFused:     parseFloat(d[12] || row['Temp Fused (°C)'])      || 0,
-    humidityFused: parseFloat(d[13] || row['Humidity Fused (%)'])   || 0,
-    pressureFused: parseFloat(d[14] || row['Pressure Fused (hPa)']) || 0,
-    gasRatio:      parseFloat(d[15] || row['Gas Ratio'])             || 0,
-    riskScore:     parseFloat(d[16] || row['Risk Score'])            || 0,
-    fireStage:     parseInt(d[17]   || row['Fire Stage'])            || 0,
-    stageName:     d[18]  || row['Stage Name']                       || 'NORMAL',
-    tempRate:      parseFloat(d[19] || row['Temp Rate (°C/min)'])    || 0,
-    humidityRate:  parseFloat(d[20] || row['Humidity Rate (%/min)']) || 0,
-    gasRate:       parseFloat(d[21] || row['Gas Rate (Ω/min)'])      || 0,
-    soc:           parseFloat(d[22] || row['SOC (%)'])               || 0,
-    rssi:          parseInt(d[23]   || row['RSSI (dBm)'])            || 0,
-    interval:      parseFloat(d[24] || row['Interval (min)'])        || 0
-  };
+  const index = headerMap[name];
+  return index !== undefined ? d[index] : '';
 }
 
 // ── Helper: Check if row has valid data ───────────────
 function isValidRow(row) {
-  const d = row._rawData || [];
-  const nodeId = parseInt(d[1] || row['Node ID']);
+  const nodeId = parseInt(getVal(row, 'Node ID'));
   return !isNaN(nodeId) && nodeId > 0;
+}
+
+// ── Helper: Parse NodeData Row ────────────────────────
+function parseNodeRow(row) {
+  return {
+    timestamp:     getVal(row, 'Timestamp'),
+    nodeId:        parseInt(getVal(row, 'Node ID'))                || 0,
+    online:        getVal(row, 'Online')                           === 'Online',
+    temp680:       parseFloat(getVal(row, 'T680 (°C)'))            || 0,
+    humidity680:   parseFloat(getVal(row, 'H680 (%)'))             || 0,
+    pressure680:   parseFloat(getVal(row, 'P680 (hPa)'))           || 0,
+    gasResistance: parseFloat(getVal(row, 'Gas R (Ω)'))            || 0,
+    temp280:       parseFloat(getVal(row, 'T280 (°C)'))            || 0,
+    humidity280:   parseFloat(getVal(row, 'H280 (%)'))             || 0,
+    pressure280:   parseFloat(getVal(row, 'P280 (hPa)'))           || 0,
+    pm25:          parseFloat(getVal(row, 'PM2.5 (µg/m³)'))        || 0,
+    pm10:          parseFloat(getVal(row, 'PM10 (µg/m³)'))         || 0,
+    tempFused:     parseFloat(getVal(row, 'Temp Fused (°C)'))      || 0,
+    humidityFused: parseFloat(getVal(row, 'Humidity Fused (%)'))   || 0,
+    pressureFused: parseFloat(getVal(row, 'Pressure Fused (hPa)')) || 0,
+    gasRatio:      parseFloat(getVal(row, 'Gas Ratio'))            || 0,
+    riskScore:     parseFloat(getVal(row, 'Risk Score'))           || 0,
+    fireStage:     parseInt(getVal(row, 'Fire Stage'))             || 0,
+    stageName:     getVal(row, 'Stage Name')                       || 'NORMAL',
+    tempRate:      parseFloat(getVal(row, 'Temp Rate (°C/min)'))   || 0,
+    humidityRate:  parseFloat(getVal(row, 'Humidity Rate (%/min)'))|| 0,
+    gasRate:       parseFloat(getVal(row, 'Gas Rate (Ω/min)'))     || 0,
+    soc:           parseFloat(getVal(row, 'SOC (%)'))              || 0,
+    rssi:          parseInt(getVal(row, 'RSSI (dBm)'))             || 0,
+    interval:      parseFloat(getVal(row, 'Interval (min)'))       || 0
+  };
 }
 
 // ── REST API Endpoints ────────────────────────────────
@@ -127,17 +148,6 @@ app.get('/api/sensor-data/latest', async (req, res) => {
     const sheet = doc.sheetsByIndex[1];
     const rows = await sheet.getRows();
 
-    // Debug: log first row keys
-    if (rows.length > 0) {
-      const firstRowKeys = rows[0]._rawData ? 
-        sheet.headerValues : 
-        Object.keys(rows[0]);
-      console.log('Sheet headers:', JSON.stringify(sheet.headerValues));
-      console.log('First row Node ID value:', rows[0]['Node ID']);
-      console.log('Total rows:', rows.length);
-    }
-
-    // Find last row with valid Node ID
     let lastValidRow = null;
     for (let i = rows.length - 1; i >= 0; i--) {
       if (isValidRow(rows[i])) {
@@ -147,11 +157,7 @@ app.get('/api/sensor-data/latest', async (req, res) => {
     }
 
     if (!lastValidRow) {
-      return res.status(404).json({ 
-        error: 'No valid data found',
-        totalRows: rows.length,
-        headers: sheet.headerValues
-      });
+      return res.status(404).json({ error: 'No valid data found' });
     }
 
     res.json(parseNodeRow(lastValidRow));
@@ -170,22 +176,22 @@ app.get('/api/aggregate', async (req, res) => {
     const rows = await sheet.getRows();
     const latestRow = rows[rows.length - 1];
     res.json({
-      timestamp:     latestRow['Timestamp'],
-      totalNodes:    parseInt(latestRow['Total Nodes'])    || 0,
-      online:        parseInt(latestRow['Online'])          || 0,
-      offline:       parseInt(latestRow['Offline'])         || 0,
-      tempAvg:       parseFloat(latestRow['Temp Avg'])      || 0,
-      humidityAvg:   parseFloat(latestRow['Humidity Avg'])  || 0,
-      pm25Avg:       parseFloat(latestRow['PM2.5 Avg'])     || 0,
-      gasRatioAvg:   parseFloat(latestRow['Gas Ratio Avg']) || 0,
-      riskAvg:       parseFloat(latestRow['Risk Avg'])      || 0,
-      riskMax:       parseFloat(latestRow['Risk Max'])      || 0,
-      fireStage:     parseInt(latestRow['Fire Stage'])      || 0,
-      stageName:     latestRow['Stage Name']               || 'NORMAL',
-      normalCount:   parseInt(latestRow['Normal Count'])    || 0,
-      alertCount:    parseInt(latestRow['Alert Count'])     || 0,
-      elevatedCount: parseInt(latestRow['Elevated Count'])  || 0,
-      criticalCount: parseInt(latestRow['Critical Count'])  || 0
+      timestamp:     getVal(latestRow, 'Timestamp'),
+      totalNodes:    parseInt(getVal(latestRow, 'Total Nodes'))    || 0,
+      online:        parseInt(getVal(latestRow, 'Online'))          || 0,
+      offline:       parseInt(getVal(latestRow, 'Offline'))         || 0,
+      tempAvg:       parseFloat(getVal(latestRow, 'Temp Avg'))      || 0,
+      humidityAvg:   parseFloat(getVal(latestRow, 'Humidity Avg'))  || 0,
+      pm25Avg:       parseFloat(getVal(latestRow, 'PM2.5 Avg'))     || 0,
+      gasRatioAvg:   parseFloat(getVal(latestRow, 'Gas Ratio Avg')) || 0,
+      riskAvg:       parseFloat(getVal(latestRow, 'Risk Avg'))      || 0,
+      riskMax:       parseFloat(getVal(latestRow, 'Risk Max'))      || 0,
+      fireStage:     parseInt(getVal(latestRow, 'Fire Stage'))      || 0,
+      stageName:     getVal(latestRow, 'Stage Name')               || 'NORMAL',
+      normalCount:   parseInt(getVal(latestRow, 'Normal Count'))    || 0,
+      alertCount:    parseInt(getVal(latestRow, 'Alert Count'))     || 0,
+      elevatedCount: parseInt(getVal(latestRow, 'Elevated Count'))  || 0,
+      criticalCount: parseInt(getVal(latestRow, 'Critical Count'))  || 0
     });
   } catch (error) {
     console.error('Error fetching aggregate:', error);
@@ -201,11 +207,11 @@ app.get('/api/alerts', async (req, res) => {
     const sheet = doc.sheetsByIndex[3];
     const rows = await sheet.getRows();
     res.json(rows.map(row => ({
-      timestamp: row['Timestamp'],
-      nodeId:    parseInt(row['Node ID']) || 0,
-      alertType: row['Alert Type']        || '',
-      message:   row['Message']           || '',
-      resolved:  row['Resolved'] === 'Yes'
+      timestamp: getVal(row, 'Timestamp'),
+      nodeId:    parseInt(getVal(row, 'Node ID')) || 0,
+      alertType: getVal(row, 'Alert Type')        || '',
+      message:   getVal(row, 'Message')           || '',
+      resolved:  getVal(row, 'Resolved')          === 'Yes'
     })));
   } catch (error) {
     console.error('Error fetching alerts:', error);
@@ -241,7 +247,6 @@ if (process.env.NODE_ENV !== 'test') {
       const nodeRows  = await nodeSheet.getRows();
       const aggRows   = await aggSheet.getRows();
 
-      // Get last valid node row
       let lastValidNode = null;
       for (let i = nodeRows.length - 1; i >= 0; i--) {
         if (isValidRow(nodeRows[i])) {
@@ -252,13 +257,14 @@ if (process.env.NODE_ENV !== 'test') {
 
       if (!lastValidNode) return;
 
+      const lastAgg = aggRows[aggRows.length - 1];
       const data = {
         node: parseNodeRow(lastValidNode),
         aggregate: {
-          stageName:  aggRows[aggRows.length - 1]['Stage Name'] || 'NORMAL',
-          riskAvg:    parseFloat(aggRows[aggRows.length - 1]['Risk Avg'])     || 0,
-          online:     parseInt(aggRows[aggRows.length - 1]['Online'])         || 0,
-          totalNodes: parseInt(aggRows[aggRows.length - 1]['Total Nodes'])    || 0
+          stageName:  getVal(lastAgg, 'Stage Name') || 'NORMAL',
+          riskAvg:    parseFloat(getVal(lastAgg, 'Risk Avg'))     || 0,
+          online:     parseInt(getVal(lastAgg, 'Online'))         || 0,
+          totalNodes: parseInt(getVal(lastAgg, 'Total Nodes'))    || 0
         },
         broadcastTime: new Date().toISOString()
       };
