@@ -63,43 +63,41 @@ if (process.env.NODE_ENV !== 'test') {
 
 // ── Helper: Parse NodeData Row ────────────────────────
 function parseNodeRow(row) {
+  const d = row._rawData || [];
   return {
-    timestamp:     row['Timestamp'],
-    nodeId:        parseInt(row['Node ID'])                || 0,
-    online:        row['Online'] === 'Online',
-    temp680:       parseFloat(row['T680 (°C)'])            || 0,
-    humidity680:   parseFloat(row['H680 (%)'])             || 0,
-    pressure680:   parseFloat(row['P680 (hPa)'])           || 0,
-    gasResistance: parseFloat(row['Gas R (Ω)'])            || 0,
-    temp280:       parseFloat(row['T280 (°C)'])            || 0,
-    humidity280:   parseFloat(row['H280 (%)'])             || 0,
-    pressure280:   parseFloat(row['P280 (hPa)'])           || 0,
-    pm25:          parseFloat(row['PM2.5 (µg/m³)'])        || 0,
-    pm10:          parseFloat(row['PM10 (µg/m³)'])         || 0,
-    tempFused:     parseFloat(row['Temp Fused (°C)'])      || 0,
-    humidityFused: parseFloat(row['Humidity Fused (%)'])   || 0,
-    pressureFused: parseFloat(row['Pressure Fused (hPa)']) || 0,
-    gasRatio:      parseFloat(row['Gas Ratio'])            || 0,
-    riskScore:     parseFloat(row['Risk Score'])           || 0,
-    fireStage:     parseInt(row['Fire Stage'])             || 0,
-    stageName:     row['Stage Name']                       || 'NORMAL',
-    tempRate:      parseFloat(row['Temp Rate (°C/min)'])   || 0,
-    humidityRate:  parseFloat(row['Humidity Rate (%/min)'])|| 0,
-    gasRate:       parseFloat(row['Gas Rate (Ω/min)'])     || 0,
-    soc:           parseFloat(row['SOC (%)'])              || 0,
-    rssi:          parseInt(row['RSSI (dBm)'])             || 0,
-    interval:      parseFloat(row['Interval (min)'])       || 0
+    timestamp:     d[0]  || row['Timestamp']                || '',
+    nodeId:        parseInt(d[1]  || row['Node ID'])         || 0,
+    online:        (d[2]  || row['Online'])                  === 'Online',
+    temp680:       parseFloat(d[3]  || row['T680 (°C)'])     || 0,
+    humidity680:   parseFloat(d[4]  || row['H680 (%)'])      || 0,
+    pressure680:   parseFloat(d[5]  || row['P680 (hPa)'])    || 0,
+    gasResistance: parseFloat(d[6]  || row['Gas R (Ω)'])     || 0,
+    temp280:       parseFloat(d[7]  || row['T280 (°C)'])     || 0,
+    humidity280:   parseFloat(d[8]  || row['H280 (%)'])      || 0,
+    pressure280:   parseFloat(d[9]  || row['P280 (hPa)'])    || 0,
+    pm25:          parseFloat(d[10] || row['PM2.5 (µg/m³)']) || 0,
+    pm10:          parseFloat(d[11] || row['PM10 (µg/m³)'])  || 0,
+    tempFused:     parseFloat(d[12] || row['Temp Fused (°C)'])      || 0,
+    humidityFused: parseFloat(d[13] || row['Humidity Fused (%)'])   || 0,
+    pressureFused: parseFloat(d[14] || row['Pressure Fused (hPa)']) || 0,
+    gasRatio:      parseFloat(d[15] || row['Gas Ratio'])             || 0,
+    riskScore:     parseFloat(d[16] || row['Risk Score'])            || 0,
+    fireStage:     parseInt(d[17]   || row['Fire Stage'])            || 0,
+    stageName:     d[18]  || row['Stage Name']                       || 'NORMAL',
+    tempRate:      parseFloat(d[19] || row['Temp Rate (°C/min)'])    || 0,
+    humidityRate:  parseFloat(d[20] || row['Humidity Rate (%/min)']) || 0,
+    gasRate:       parseFloat(d[21] || row['Gas Rate (Ω/min)'])      || 0,
+    soc:           parseFloat(d[22] || row['SOC (%)'])               || 0,
+    rssi:          parseInt(d[23]   || row['RSSI (dBm)'])            || 0,
+    interval:      parseFloat(d[24] || row['Interval (min)'])        || 0
   };
 }
 
 // ── Helper: Check if row has valid data ───────────────
 function isValidRow(row) {
-  // google-spreadsheet v4 uses _rawData array
-  // Node ID is column B (index 1)
-  if (row._rawData && row._rawData[1]) {
-    return parseInt(row._rawData[1]) > 0;
-  }
-  return parseInt(row['Node ID']) > 0;
+  const d = row._rawData || [];
+  const nodeId = parseInt(d[1] || row['Node ID']);
+  return !isNaN(nodeId) && nodeId > 0;
 }
 
 // ── REST API Endpoints ────────────────────────────────
