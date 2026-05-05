@@ -95,7 +95,10 @@ function parseNodeRow(row) {
 // ── Helper: Check if row has valid data ───────────────
 function isValidRow(row) {
   const nodeId = parseInt(row['Node ID']);
-  return nodeId > 0;
+  const timestamp = row['Timestamp'];
+  const online = row['Online'];
+  return (nodeId > 0) || 
+         (timestamp && timestamp.length > 0 && online === 'Online');
 }
 
 // ── REST API Endpoints ────────────────────────────────
