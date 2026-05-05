@@ -94,11 +94,12 @@ function parseNodeRow(row) {
 
 // ── Helper: Check if row has valid data ───────────────
 function isValidRow(row) {
-  const nodeId = parseInt(row['Node ID']);
-  const timestamp = row['Timestamp'];
-  const online = row['Online'];
-  return (nodeId > 0) || 
-         (timestamp && timestamp.length > 0 && online === 'Online');
+  // google-spreadsheet v4 uses _rawData array
+  // Node ID is column B (index 1)
+  if (row._rawData && row._rawData[1]) {
+    return parseInt(row._rawData[1]) > 0;
+  }
+  return parseInt(row['Node ID']) > 0;
 }
 
 // ── REST API Endpoints ────────────────────────────────
