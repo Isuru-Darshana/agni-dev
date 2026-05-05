@@ -39,12 +39,15 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY
 async function buildHeaderMap(sheet) {
   await sheet.loadHeaderRow();
   headerMap = {};
+  // Include ALL positions including empty headers
   sheet.headerValues.forEach((header, index) => {
-    if (header) headerMap[header] = index;
+    if (header && header.trim()) {
+      headerMap[header.trim()] = index;
+    }
   });
   console.log('✅ Header map built:', JSON.stringify(headerMap));
+  console.log('✅ Total header positions:', sheet.headerValues.length);
 }
-
 async function initSheet() {
   try {
     const jwt = new JWT({
@@ -74,14 +77,17 @@ if (process.env.NODE_ENV !== 'test') {
 
 // ── Helper: Get value from row by header name ─────────
 function getVal(row, name) {
-  // Handle test mocks (plain objects with direct properties)
-  if (row[name] !== undefined) {
+  // For test mocks - check direct property first
+  if (!row._rawData && row[name] !== undefined) {
     return row[name];
   }
-  // Handle real Google Sheets rows (_rawData array)
+  // For real Google Sheets rows - use header map index
   const d = row._rawData || [];
   const index = headerMap[name];
-  return index !== undefined ? d[index] : '';
+  if (index !== undefined && d[index] !== undefined) {
+    return d[index];
+  }
+  return '';
 }
 
 // ── Helper: Check if row has valid data ───────────────
