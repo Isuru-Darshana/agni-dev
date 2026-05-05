@@ -10,22 +10,22 @@ data "aws_subnets" "default" {
 }
 
 resource "aws_security_group" "ecs" {
-  name        = "${var.project_name}-ecs-sg"
-  description = "AGNI GUARD ECS tasks security group"
+  name        = "${var.project_name}-sg"
+  description = "Created in ECS Console"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    from_port       = var.container_port
-    to_port         = var.container_port
-    protocol        = "tcp"
-    security_groups = [var.alb_sg_id]
+    from_port   = var.container_port
+    to_port     = var.container_port
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    from_port       = var.websocket_port
-    to_port         = var.websocket_port
-    protocol        = "tcp"
-    cidr_blocks     = ["0.0.0.0/0"]
+    from_port   = var.websocket_port
+    to_port     = var.websocket_port
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
@@ -130,7 +130,24 @@ resource "aws_ecs_service" "this" {
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.this.arn
   desired_count   = 1
-  launch_type     = "FARGATE"
+
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+    weight            = 1
+    base              = 0
+  }
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
+  deployment_controller {
+    type = "ECS"
+  }
+
+  availability_zone_rebalancing = "ENABLED"
+  enable_ecs_managed_tags       = true
 
   network_configuration {
     subnets          = data.aws_subnets.default.ids

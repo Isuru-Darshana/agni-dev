@@ -1,6 +1,6 @@
 # ECS Task Execution Role
 resource "aws_iam_role" "execution_role" {
-  name = "${var.project_name}-ecs-execution-role"
+  name = "AgniGuardECSExecutionRole"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -42,7 +42,7 @@ resource "aws_iam_role_policy" "execution_role_secrets" {
 
 # ECS Task Role
 resource "aws_iam_role" "task_role" {
-  name = "${var.project_name}-ecs-task-role"
+  name = "AgniGuardECSTaskRole"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
