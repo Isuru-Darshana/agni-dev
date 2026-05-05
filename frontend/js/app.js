@@ -6,8 +6,8 @@
 // ============================================
 
 const API_CONFIG = {
-    BACKEND_URL: 'http://65.2.179.194:3000',
-    WS_URL: 'ws://65.2.179.194:8080',
+    BACKEND_URL: 'http://agni-guard-alb-1595568876.ap-south-1.elb.amazonaws.com',
+    WS_URL: 'ws://agni-guard-alb-1595568876.ap-south-1.elb.amazonaws.com:8080',
     FETCH_INTERVAL: 5000,
     ENABLE_LIVE_DATA: true
 };
