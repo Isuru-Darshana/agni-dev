@@ -48,11 +48,11 @@ AGNI GUARD is a wireless sensor network (WSN) designed for wildfire detection in
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    FIELD DEPLOYMENT                          │
+│                    FIELD DEPLOYMENT                         │
 │                                                             │
 │  [Edge Node 1]  [Edge Node 2]  ...  [Edge Node N]           │
 │  BME688/BME280                                              │
-│  LoRa SX1278       LoRa P2P Communication                  │
+│  LoRa SX1278       LoRa P2P Communication                   │
 │       │                 │                                   │
 │       └────────┬────────┘                                   │
 │                │                                            │
@@ -63,7 +63,7 @@ AGNI GUARD is a wireless sensor network (WSN) designed for wildfire detection in
                  │ HTTPS
                  ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    CLOUD INFRASTRUCTURE                      │
+│                    CLOUD INFRASTRUCTURE                     │
 │                                                             │
 │  Google Sheets ──► Node.js Backend ──► AWS ECS Fargate      │
 │  (Data Store)      (REST + WS API)     (Container)          │
