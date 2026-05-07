@@ -2,6 +2,11 @@ process.env.NODE_ENV = 'test';
 
 const request = require('supertest');
 
+// ── Mock google-auth-library ──────────────────────────
+jest.mock('google-auth-library', () => ({
+  JWT: jest.fn().mockImplementation(() => ({}))
+}));
+
 // ── Mock Google Sheets ────────────────────────────────
 jest.mock('google-spreadsheet', () => ({
   GoogleSpreadsheet: jest.fn().mockImplementation(() => ({
@@ -15,6 +20,16 @@ jest.mock('google-spreadsheet', () => ({
         ])
       },
       {
+        loadHeaderRow: jest.fn().mockResolvedValue(true),
+        headerValues: [
+          'Node ID', '', 'Online', 'T680 (°C)', 'H680 (%)', 'P680 (hPa)',
+          'Gas R (Ω)', 'T280 (°C)', 'H280 (%)', 'P280 (hPa)',
+          'PM2.5 (µg/m³)', 'PM10 (µg/m³)', 'Temp Fused (°C)',
+          'Humidity Fused (%)', 'Pressure Fused (hPa)', 'Gas Ratio',
+          'Risk Score', 'Fire Stage', 'Stage Name',
+          'Temp Rate (°C/min)', 'Humidity Rate (%/min)', 'Gas Rate (Ω/min)',
+          'SOC (%)', 'RSSI (dBm)', 'Interval (min)', 'Timestamp'
+        ],
         getRows: jest.fn().mockResolvedValue([
           {
             'Timestamp':              '2024-01-01 10:00:00',
@@ -91,6 +106,15 @@ beforeAll(() => {
 
 // ── Test Suites ───────────────────────────────────────
 describe('AGNI GUARD Backend API', () => {
+
+  beforeEach(() => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   // ── Health Endpoint ─────────────────────────────────
   describe('Health Endpoint', () => {
@@ -337,6 +361,169 @@ describe('AGNI GUARD Backend API', () => {
     test('unknown route returns json error message', async () => {
       const res = await request(app).get('/api/unknown');
       expect(res.body).toHaveProperty('error');
+    });
+  });
+
+  // ── 503 When Sheets Not Ready ────────────────────────
+  describe('503 when sheets not initialised', () => {
+    afterEach(() => {
+      app.setTestMode(true);
+    });
+
+    test('GET /api/sensor-data returns 503', async () => {
+      app.setTestMode(false);
+      const res = await request(app).get('/api/sensor-data');
+      expect(res.statusCode).toBe(503);
+      expect(res.body).toHaveProperty('error', 'Service initializing');
+    });
+
+    test('GET /api/sensor-data/latest returns 503', async () => {
+      app.setTestMode(false);
+      const res = await request(app).get('/api/sensor-data/latest');
+      expect(res.statusCode).toBe(503);
+      expect(res.body).toHaveProperty('error', 'Service initializing');
+    });
+
+    test('GET /api/aggregate returns 503', async () => {
+      app.setTestMode(false);
+      const res = await request(app).get('/api/aggregate');
+      expect(res.statusCode).toBe(503);
+      expect(res.body).toHaveProperty('error', 'Service initializing');
+    });
+
+    test('GET /api/alerts returns 503', async () => {
+      app.setTestMode(false);
+      const res = await request(app).get('/api/alerts');
+      expect(res.statusCode).toBe(503);
+      expect(res.body).toHaveProperty('error', 'Service initializing');
+    });
+  });
+
+  // ── 500 Error Handling ───────────────────────────────
+  describe('500 when sheet throws', () => {
+    afterEach(() => {
+      app.setTestMode(true);
+    });
+
+    test('GET /api/sensor-data returns 500 on sheet error', async () => {
+      app.setTestMode(true);
+      app.getDoc().sheetsByIndex[1].getRows.mockRejectedValueOnce(new Error('Sheet read failed'));
+      const res = await request(app).get('/api/sensor-data');
+      expect(res.statusCode).toBe(500);
+      expect(res.body).toHaveProperty('error');
+    });
+
+    test('GET /api/sensor-data/latest returns 500 on sheet error', async () => {
+      app.setTestMode(true);
+      app.getDoc().sheetsByIndex[1].getRows.mockRejectedValueOnce(new Error('Sheet read failed'));
+      const res = await request(app).get('/api/sensor-data/latest');
+      expect(res.statusCode).toBe(500);
+      expect(res.body).toHaveProperty('error');
+    });
+
+    test('GET /api/aggregate returns 500 on sheet error', async () => {
+      app.setTestMode(true);
+      app.getDoc().sheetsByIndex[2].getRows.mockRejectedValueOnce(new Error('Sheet read failed'));
+      const res = await request(app).get('/api/aggregate');
+      expect(res.statusCode).toBe(500);
+      expect(res.body).toHaveProperty('error');
+    });
+
+    test('GET /api/alerts returns 500 on sheet error', async () => {
+      app.setTestMode(true);
+      app.getDoc().sheetsByIndex[3].getRows.mockRejectedValueOnce(new Error('Sheet read failed'));
+      const res = await request(app).get('/api/alerts');
+      expect(res.statusCode).toBe(500);
+      expect(res.body).toHaveProperty('error');
+    });
+  });
+
+  // ── 404 No Data ──────────────────────────────────────
+  describe('404 when no valid rows', () => {
+    afterEach(() => {
+      app.setTestMode(true);
+    });
+
+    test('GET /api/sensor-data/latest returns 404 when no valid rows', async () => {
+      app.setTestMode(true);
+      app.getDoc().sheetsByIndex[1].getRows.mockResolvedValueOnce([]);
+      const res = await request(app).get('/api/sensor-data/latest');
+      expect(res.statusCode).toBe(404);
+      expect(res.body).toHaveProperty('error', 'No valid data found');
+    });
+
+    test('GET /api/sensor-data/latest returns 404 when all rows invalid', async () => {
+      app.setTestMode(true);
+      app.getDoc().sheetsByIndex[1].getRows.mockResolvedValueOnce([
+        { 'Node ID': 'bad' }, { 'Node ID': '' }
+      ]);
+      const res = await request(app).get('/api/sensor-data/latest');
+      expect(res.statusCode).toBe(404);
+    });
+  });
+
+  // ── buildHeaderMap / initSheet / getVal ──────────────
+  describe('Internal helpers', () => {
+    beforeEach(() => {
+      app.setTestMode();
+    });
+
+    test('buildHeaderMap loads header row and maps non-empty headers', async () => {
+      const mockSheet = {
+        loadHeaderRow: jest.fn().mockResolvedValue(true),
+        headerValues: ['Node ID', '', 'Online', 'T680 (°C)']
+      };
+      await app.buildHeaderMapForTest(mockSheet);
+      expect(mockSheet.loadHeaderRow).toHaveBeenCalledTimes(1);
+    });
+
+    test('initSheet connects to Google Sheets and sets ready', async () => {
+      await app.initSheetForTest();
+      const res = await request(app).get('/health');
+      expect(res.body.sheets).toBe('connected');
+    });
+
+    test('initSheet catches errors without throwing', async () => {
+      jest.spyOn(global, 'setTimeout').mockImplementation(() => {});
+      const { GoogleSpreadsheet } = require('google-spreadsheet');
+      GoogleSpreadsheet.mockImplementationOnce(() => ({
+        loadInfo: jest.fn().mockRejectedValue(new Error('Auth failed')),
+        sheetsByIndex: [],
+        title: 'Test'
+      }));
+      await app.initSheetForTest();
+    });
+
+    test('getVal reads values from _rawData using header index', async () => {
+      const mockSheet = {
+        loadHeaderRow: jest.fn().mockResolvedValue(true),
+        headerValues: ['Node ID', '', 'Online', 'T680 (°C)']
+      };
+      await app.buildHeaderMapForTest(mockSheet);
+      app.getDoc().sheetsByIndex[1].getRows.mockResolvedValueOnce([
+        { _rawData: ['1', '', 'Online', '31.2'] }
+      ]);
+      const res = await request(app).get('/api/sensor-data');
+      expect(res.statusCode).toBe(200);
+      expect(res.body[0].nodeId).toBe(1);
+      expect(res.body[0].online).toBe(true);
+      expect(res.body[0].temp680).toBe(31.2);
+      expect(res.body[0].humidity680).toBe(0);
+    });
+
+    test('getVal returns empty string when header not in map', async () => {
+      const mockSheet = {
+        loadHeaderRow: jest.fn().mockResolvedValue(true),
+        headerValues: ['Node ID']
+      };
+      await app.buildHeaderMapForTest(mockSheet);
+      app.getDoc().sheetsByIndex[1].getRows.mockResolvedValueOnce([
+        { _rawData: ['1'] }
+      ]);
+      const res = await request(app).get('/api/sensor-data');
+      expect(res.statusCode).toBe(200);
+      expect(res.body[0].nodeId).toBe(1);
+      expect(res.body[0].temp680).toBe(0);
     });
   });
 });

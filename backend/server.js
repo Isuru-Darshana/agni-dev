@@ -304,9 +304,12 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // ── Test Helper ───────────────────────────────────────
-app.setTestMode = () => {
-  sheetsReady = true;
-  doc = new GoogleSpreadsheet();
+app.setTestMode = (ready = true) => {
+  sheetsReady = ready;
+  if (ready) doc = new GoogleSpreadsheet();
 };
+app.getDoc = () => doc;
+app.buildHeaderMapForTest = buildHeaderMap;
+app.initSheetForTest = initSheet;
 
 module.exports = app;
