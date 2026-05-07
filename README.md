@@ -48,11 +48,11 @@ AGNI GUARD is a wireless sensor network (WSN) designed for wildfire detection in
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    FIELD DEPLOYMENT                          │
+│                    FIELD DEPLOYMENT                         │
 │                                                             │
 │  [Edge Node 1]  [Edge Node 2]  ...  [Edge Node N]           │
 │  BME688/BME280                                              │
-│  LoRa SX1278       LoRa P2P Communication                  │
+│  LoRa SX1278       LoRa P2P Communication                   │
 │       │                 │                                   │
 │       └────────┬────────┘                                   │
 │                │                                            │
@@ -63,7 +63,7 @@ AGNI GUARD is a wireless sensor network (WSN) designed for wildfire detection in
                  │ HTTPS
                  ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    CLOUD INFRASTRUCTURE                      │
+│                    CLOUD INFRASTRUCTURE                     │
 │                                                             │
 │  Google Sheets ──► Node.js Backend ──► AWS ECS Fargate      │
 │  (Data Store)      (REST + WS API)     (Container)          │
@@ -362,10 +362,10 @@ Region: ap-south-1
 
 | Member | Role |
 |--------|------|
-| Isuru Darshana Indrajith | Project Lead, DevOps Implementation |
-| Himan | Firmware Development |
-| Piyas | LoRa Communications |
-| Ashinikas | LoRa Link Budget Calculations |
+| Isuru Darshana Indrajith | Project Lead, DevOps Implementation, Hardware & PCB Design, Firmware Development |
+| Himan Michael | Firmware Development |
+| Piyas Mohammed| LoRa Communications, Web Development |
+| Ashinika Thathsarani | LoRa Link Budget Calculations, Theoretical Calculations |
 
 **Institution:** General Sir John Kotelawala Defence University (KDU), Sri Lanka  
 **Degree:** B.Sc. (Hons) in Electronic & Telecommunication Engineering  
@@ -375,7 +375,7 @@ Region: ap-south-1
 
 ## Awards
 
-🏆 **Best Paper Award** — KDU IGNITE'26
+🏆 **Best Paper Award** — KDU IGNITE'26(Except the Extension of CI/CD Part)
 
 ---
 
