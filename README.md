@@ -362,7 +362,7 @@ Region: ap-south-1
 
 | Member | Role |
 |--------|------|
-| Isuru Darshana Indrajith | Project Lead, DevOps Implementation, Hardware & PCB Design |
+| Isuru Darshana Indrajith | Project Lead, DevOps Implementation, Hardware & PCB Design, Firmware Development |
 | Himan Michael | Firmware Development |
 | Piyas Mohammed| LoRa Communications, Web Development |
 | Ashinika Thathsarani | LoRa Link Budget Calculations, Theoretical Calculations |
